@@ -161,35 +161,35 @@ public class ModuleFactoid extends Module {
 		}
 	}
 	
-    public String parseWithRecurse(PircBotX bot, Channel channel, User sender, String message, ArrayList checkRecursive)
-    {
-    	String factoid = message.split(" ")[0].toLowerCase();
-    	if (cfg.exists("r_"+factoid)) {
-    		String raw = cfg.getString("r_"+factoid);
-    		if (raw.startsWith("<alias>")) // Alias check
+	public String parseWithRecurse(PircBotX bot, Channel channel, User sender, String message, ArrayList checkRecursive)
+	{
+		String factoid = message.split(" ")[0].toLowerCase();
+		if (cfg.exists("r_"+factoid)) {
+			String raw = cfg.getString("r_"+factoid);
+			if (raw.startsWith("<alias>")) // Alias check
 			{
-    			msg = raw.substring(7);
-    			if (checkRecursive.contains(msg))
+				msg = raw.substring(7);
+				if (checkRecursive.contains(msg))
 				{
 					return "Recursive loop detected. Factoid retreival aborted.";
 				}
-                checkRecursive.add(msg);
-    		}
+				checkRecursive.add(msg);
+			}
 			String result = parse(bot,channel,sender,message,raw);
 			if (result.startsWith("<alias>"))
 			{
-		        return parseWithRecursive(bot,channel,sender,result,raw,checkRecursive);
-		        // The recursive part
+				return parseWithRecursive(bot,channel,sender,result,raw,checkRecursive);
+				// The recursive part
 			}
 			else return result; // Normal exit point
-        } else { // No factoid found
-            if (!checkRecursive.isEmpty())
-            {
-                return "ALIAS_NOT_FOUND"; // Designed for both factoid debugging and catching
-            }
-            return null; // Don't return anything for 
-        }
-    }
+		} else { // No factoid found
+			if (!checkRecursive.isEmpty())
+			{
+				return "ALIAS_NOT_FOUND"; // Designed for both factoid debugging and catching
+			}
+			return null; // Don't return anything for non-alias calls
+		}
+	}
     
 	public String parse(PircBotX bot, Channel channel, User sender, String message, String raw) {
 		if (raw.startsWith("<noreply>")) {
