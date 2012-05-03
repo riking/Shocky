@@ -156,7 +156,7 @@ public class ModuleFactoid extends Module {
 			
 			if (target != null) Shocky.overrideTarget.put(Thread.currentThread(),new Pair<Command.EType,Command.EType>(Command.EType.Channel,Command.EType.Notice));
 			String postparse = parseWithRecurse(bot,channel,sender,msg,new ArrayList<String>());
-            if (result != null) Shocky.send(bot,Command.EType.Channel,channel,Shocky.getUser(target),postparse);
+			if (result != null) Shocky.send(bot,Command.EType.Channel,channel,Shocky.getUser(target),postparse);
 			if (target != null) Shocky.overrideTarget.remove(Thread.currentThread());
 		}
 	}
