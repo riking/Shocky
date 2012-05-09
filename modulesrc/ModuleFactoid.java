@@ -269,7 +269,7 @@ public class ModuleFactoid extends Module {
 	{
 			if (global.existsConfig(chan)) {
 				Config cfg = global.getConfig(chan);
-				if (cfg.exists("r_"+msg)) return cfg;
+				if (cfg.exists("r_"+factoid)) return cfg;
 			}
 			return global;
 	}
@@ -278,7 +278,7 @@ public class ModuleFactoid extends Module {
 	private boolean factoidHasLocal(Config global, String chan, String factoid)
 	{
 		if (global.existsConfig(chan)) {
-			if (global.getConfig(chan).exists("r_"+msg)) return true;
+			if (global.getConfig(chan).exists("r_"+factoid)) return true;
 		}
 		return false;
 	}
