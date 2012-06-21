@@ -17,50 +17,51 @@ public class CmdController extends Command {
 	}
 	public boolean matches(PircBotX bot, EType type, String cmd) {return cmd.equals(command()) || cmd.equals("ctrl");}
 	
-	public void doCommand(PircBotX bot, EType type, Channel channel, User sender, String message) {
+	public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
 		if (!canUseController(bot,type,sender)) return;
 		String[] args = message.split(" ");
+		callback.type = EType.Notice;
 		
 		if (args.length == 1) {
 			StringBuilder sb = new StringBuilder();
-			for (String controller : Data.getControllers()) {
+			for (String controller : Data.controllers) {
 				if (sb.length() != 0) sb.append(", ");
 				sb.append(controller);
 			}
-			Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,sb.toString());
+			callback.append(sb);
 			return;
 		}
 		
 		if (args.length == 3) {
 			String s = args[2];
 			User u = Shocky.getUser(args[2]);
-			if (!Data.getControllers().contains(s) && u != null) {
+			if (!Data.controllers.contains(s) && u != null) {
 				if (Shocky.getLogin(u) == null) {
-					Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,s+" isn't identified");
+					callback.append(s+" isn't identified");
 					return;
 				}
 				s = Shocky.getLogin(u);
 			}
 			
 			if (args[1].toLowerCase().equals("add")) {
-				if (Data.getControllers().contains(s)) {
-					Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,s+" is already a controller");
+				if (Data.controllers.contains(s)) {
+					callback.append(s+" is already a controller");
 				} else {
-					Data.getControllers().add(s);
-					Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,"Added");
+					Data.controllers.add(s);
+					callback.append("Added");
 				}
 				return;
 			} else if (args[1].toLowerCase().equals("remove")) {
-				if (!Data.getControllers().contains(s)) {
-					Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,s+" isn't a controller");
+				if (!Data.controllers.contains(s)) {
+					callback.append(s+" isn't a controller");
 				} else {
-					Data.getControllers().remove(s);
-					Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,"Removed");
+					Data.controllers.remove(s);
+					callback.append("Removed");
 				}
 				return;
 			}
 		}
 		
-		Shocky.sendNotice(bot,sender,help(bot,type,channel,sender));
+		callback.append(help(bot,type,channel,sender));
 	}
 }

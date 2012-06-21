@@ -23,13 +23,26 @@ import pl.shockah.shocky.Module;
 import pl.shockah.shocky.Shocky;
 import pl.shockah.shocky.Utils;
 import pl.shockah.shocky.cmds.Command;
+import pl.shockah.shocky.cmds.CommandCallback;
 
 public class ModuleRSS extends Module {
+	private static final SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z",Locale.US);
+	private static final SimpleDateFormat sdf2 = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z",Locale.US); 
+	private static final SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+	private static final SimpleDateFormat sdf4 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+	
+	static {
+		 sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
+		 sdf2.setTimeZone(TimeZone.getTimeZone("GMT"));
+		 sdf3.setTimeZone(TimeZone.getTimeZone("GMT"));
+		 sdf4.setTimeZone(TimeZone.getTimeZone("GMT"));
+	}
+	
 	protected Command cmd;
 	protected ArrayList<Feed> feeds = new ArrayList<Feed>();
 	
 	public String name() {return "rss";}
-	public void load() {
+	public void onEnable() {
 		Command.addCommands(cmd = new CmdRSS());
 		
 		ArrayList<String> lines = FileLine.read(new File("data","rss.cfg"));
@@ -40,11 +53,10 @@ public class ModuleRSS extends Module {
 			feeds.add(new Feed(url,date,channels));
 		}
 	}
-	public void unload() {
+	public void onDisable() {
 		Command.removeCommands(cmd);
 		for (Feed feed : feeds) feed.stop();
 	}
-	
 	public void onDataSave() {
 		ArrayList<String> lines = new ArrayList<String>();
 		for (Feed feed : feeds) {
@@ -101,7 +113,6 @@ public class ModuleRSS extends Module {
 					q.connect(true,false);
 					XMLObject xBase = XMLObject.deserialize(q.readWhole());
 					if (xBase.getAllElements().get(0).getName().equals("feed")) {
-						SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'"); sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 						ArrayList<XMLObject> xEntries = xBase.getElement("feed").get(0).getElement("entry");
 						for (XMLObject xEntry : xEntries) {
 							Date entryDate;
@@ -111,14 +122,14 @@ public class ModuleRSS extends Module {
 							if (xEntry.getElement("updated").size() > 0) {
 								String s = xEntry.getElement("updated").get(0).getValue();
 								try {
-									entryDate = sdf.parse(s);
+									entryDate = sdf4.parse(s);
 								} catch (ParseException ex) {
 									entryDate = parseAtomDate(s);
 								}
 							} else if (xEntry.getElement("published").size() > 0) {
 								String s = xEntry.getElement("published").get(0).getValue();
 								try {
-									entryDate = sdf.parse(s);
+									entryDate = sdf4.parse(s);
 								} catch (ParseException ex) {
 									entryDate = parseAtomDate(s);
 								}
@@ -129,9 +140,6 @@ public class ModuleRSS extends Module {
 							if (entryDate.after(lastDate)) ret.add(new FeedEntry(entryTitle,entryLink,entryDate));
 						}
 					} else if (xBase.getAllElements().get(0).getName().equals("rss")) {
-						SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z",Locale.US); sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
-						SimpleDateFormat sdf2 = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z",Locale.US); sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
-						SimpleDateFormat sdf3 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss"); sdf2.setTimeZone(TimeZone.getTimeZone("GMT"));
 						ArrayList<XMLObject> xEntries = xBase.getElement("rss").get(0).getElement("channel").get(0).getElement("item");
 						for (XMLObject xEntry : xEntries) {
 							Date entryDate = null;
@@ -164,10 +172,10 @@ public class ModuleRSS extends Module {
 		
 		public Date parseAtomDate(String s) {
 			try {
-				SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss"); sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
+				
 				Calendar c = Calendar.getInstance();
 				c.setTimeZone(TimeZone.getTimeZone("GMT"));
-				c.setTime(sdf.parse(s.substring(0,19)));
+				c.setTime(sdf3.parse(s.substring(0,19)));
 				
 				s = s.substring(19);
 				long t = c.getTime().getTime();
@@ -215,10 +223,11 @@ public class ModuleRSS extends Module {
 		}
 		public boolean matches(PircBotX bot, EType type, String cmd) {return cmd.equals(command());}
 		
-		public void doCommand(PircBotX bot, EType type, Channel channel, User sender, String message) {
+		public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
 			String[] args = message.split(" ");
 			String action = null, url = null;
 			Channel c = null;
+			callback.type = EType.Notice;
 			
 			if (type == EType.Channel) {
 				if (args.length == 1) {
@@ -235,7 +244,7 @@ public class ModuleRSS extends Module {
 					url = args[3];
 				}
 				if (c == null) {
-					Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,"No such channel");
+					callback.append("No such channel");
 					return;
 				}
 			} else {
@@ -247,7 +256,7 @@ public class ModuleRSS extends Module {
 					url = args[3];
 				}
 				if (c == null) {
-					Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,"No such channel");
+					callback.append("No such channel");
 					return;
 				}
 			}
@@ -260,21 +269,21 @@ public class ModuleRSS extends Module {
 					if (sb.length() != 0) sb.append("\n");
 					sb.append(feed.getURL());
 				}
-				Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,sb.toString());
+				callback.append(sb);
 			} else if (action.equals("add")) {
 				for (Feed feed : feeds) {
 					if (feed.getURL().equals(url)) {
 						if (feed.channels.contains(c.getName())) {
-							Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,"Feed already on channel's list");
+							callback.append("Feed already on channel's list");
 						} else {
 							feed.channels.add(c.getName());
-							Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,"Added");
+							callback.append("Added");
 						}
 						return;
 					}
 				}
 				feeds.add(new Feed(url,null,c.getName()));
-				Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,"Added");
+				callback.append("Added");
 			} else if (action.equals("remove")) {
 				for (int i = 0; i < feeds.size(); i++) {
 					Feed feed = feeds.get(i);
@@ -285,12 +294,12 @@ public class ModuleRSS extends Module {
 								feed.stop();
 								feeds.remove(feeds.indexOf(feed));
 							}
-							Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,"Removed");
-						} else Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,"Feed isn't on channel's list");
+							callback.append("Removed");
+						} else callback.append("Feed isn't on channel's list");
 						return;
 					}
 				}
-				Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,"Feed isn't on channel's list");
+				callback.append("Feed isn't on channel's list");
 			}
 		}
 		

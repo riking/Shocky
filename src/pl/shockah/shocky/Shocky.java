@@ -3,33 +3,18 @@ package pl.shockah.shocky;
 import java.util.*;
 import org.pircbotx.*;
 import org.pircbotx.hooks.events.*;
-
-import pl.shockah.Pair;
 import pl.shockah.shocky.cmds.Command;
+import pl.shockah.shocky.cmds.Command.EType;
+import pl.shockah.shocky.cmds.CommandCallback;
 
 public class Shocky extends ListenerAdapter {
-	public static Map<Thread,Pair<Command.EType,Command.EType>> overrideTarget = Collections.synchronizedMap(new HashMap<Thread,Pair<Command.EType,Command.EType>>());
 	private static TimedActions timed;
 	private static MultiBotManager multiBot;
 	private static boolean isClosing = false;
 	
 	public static void main(String[] args) {
 		Data.load();
-		
-		Data.config.setNotExists("main-botname","Shocky");
-		Data.config.setNotExists("main-server","irc.esper.net");
-		Data.config.setNotExists("main-version","Shocky - PircBotX 1.6 - https://github.com/clone1018/Shocky - http://pircbotx.googlecode.com");
-		Data.config.setNotExists("main-verbose",false);
-		Data.config.setNotExists("main-maxchannels",10);
-		Data.config.setNotExists("main-nickservpass","");
-		Data.config.setNotExists("main-cmdchar","`~");
-		Data.config.setNotExists("main-sqlurl","http://localhost/shocky/sql.php");
-		Data.config.setNotExists("main-sqlhost","localhost");
-		Data.config.setNotExists("main-sqluser","");
-		Data.config.setNotExists("main-sqlpass","");
-		Data.config.setNotExists("main-sqldb","shocky");
-		Data.config.setNotExists("main-sqlprefix","");
-		
+				
 		multiBot = new MultiBotManager(Data.config.getString("main-botname"));
 		try {
 			multiBot.setName(Data.config.getString("main-botname"));
@@ -43,11 +28,13 @@ public class Shocky extends ListenerAdapter {
 		
 		timed = new TimedActions();
 		
+		Module.loadNewModules();
+		System.out.println("--- Shocky, the IRC bot, up and running! ---");
+		System.out.println("--- type \"help\" to list all available commands ---");
 		try {
-			MultiChannel.join(Data.getChannels().toArray(new String[0]));
+			MultiChannel.join(Data.channels.toArray(new String[0]));
 		} catch (Exception e) {e.printStackTrace();}
 		
-		Module.loadNewModules();
 		new ThreadConsoleInput().start();
 	}
 	
@@ -103,11 +90,6 @@ public class Shocky extends ListenerAdapter {
 		send(bot,t,channel,user,message);
 	}
 	public static void send(PircBotX bot, Command.EType type, Channel channel, User user, String message) {
-		Thread t = Thread.currentThread();
-		if (overrideTarget.containsKey(t)) {
-			Pair<Command.EType,Command.EType> pair = overrideTarget.get(t);
-			if (type == pair.get1()) type = pair.get2();
-		}
 		switch (type) {
 			case Channel: sendChannel(bot,channel,message); break;
 			case Private: sendPrivate(bot,user,message); break;
@@ -174,20 +156,41 @@ public class Shocky extends ListenerAdapter {
 	}
 	
 	public void onMessage(MessageEvent<PircBotX> event) {
-		if (Data.getBlacklistNicks().contains(event.getUser().getNick().toLowerCase())) return;
-		Command cmd = Command.getCommand(event.getBot(),Command.EType.Channel,event.getMessage());
-		if (cmd != null) cmd.doCommand(event.getBot(),Command.EType.Channel,event.getChannel(),event.getUser(),event.getMessage());
+		if (Data.isBlacklisted(event.getUser())) return;
+		if (event.getMessage().length()<=1) return;
+		if (!Data.config.getString("main-cmdchar").contains(event.getMessage().substring(0, 1))) return;
+		CommandCallback callback = new CommandCallback();
+		callback.targetUser = event.getUser();
+		callback.targetChannel = event.getChannel();
+		Command cmd = Command.getCommand(event.getBot(),event.getUser(),Command.EType.Channel,callback,event.getMessage().substring(1));
+		if (cmd != null)
+			cmd.doCommand(event.getBot(),Command.EType.Channel,callback,event.getChannel(),event.getUser(),event.getMessage());
+		if (callback.length()>0) {
+			if (callback.type == EType.Channel) {
+				callback.insert(0,": ");
+				callback.insert(0,event.getUser().getNick());
+			}
+			send(event.getBot(),callback.type==EType.Notice?EType.Notice:Command.EType.Channel,callback.targetChannel,callback.targetUser,callback.toString());
+		}
 	}
 	public void onPrivateMessage(PrivateMessageEvent<PircBotX> event) {
-		if (Data.getBlacklistNicks().contains(event.getUser().getNick().toLowerCase())) return;
-		Command cmd = Command.getCommand(event.getBot(),Command.EType.Private,event.getMessage());
-		if (cmd != null) cmd.doCommand(event.getBot(),Command.EType.Private,null,event.getUser(),event.getMessage());
+		if (Data.isBlacklisted(event.getUser())) return;
+		CommandCallback callback = new CommandCallback();
+		Command cmd = Command.getCommand(event.getBot(),event.getUser(),Command.EType.Private,callback,event.getMessage());
+		if (cmd != null)
+			cmd.doCommand(event.getBot(),Command.EType.Private,callback,null,event.getUser(),event.getMessage());
+		if (callback.length()>0)
+			send(event.getBot(),Command.EType.Private,null,event.getUser(),callback.toString());
 	}
 	public void onNotice(NoticeEvent<PircBotX> event) {
 		if (event.getUser().getNick().equals("NickServ")) return;
-		if (Data.getBlacklistNicks().contains(event.getUser().getNick().toLowerCase())) return;
-		Command cmd = Command.getCommand(event.getBot(),Command.EType.Notice,event.getMessage());
-		if (cmd != null) cmd.doCommand(event.getBot(),Command.EType.Notice,null,event.getUser(),event.getMessage());
+		if (Data.isBlacklisted(event.getUser())) return;
+		CommandCallback callback = new CommandCallback();
+		Command cmd = Command.getCommand(event.getBot(),event.getUser(),Command.EType.Notice,callback,event.getMessage());
+		if (cmd != null)
+			cmd.doCommand(event.getBot(),Command.EType.Notice,callback,null,event.getUser(),event.getMessage());
+		if (callback.length()>0)
+			send(event.getBot(),Command.EType.Notice,event.getChannel(),event.getUser(),callback.toString());
 	}
 	public void onKick(KickEvent<PircBotX> event) {
 		if (event.getRecipient().getNick().equals(event.getBot().getNick())) try {

@@ -1,20 +1,25 @@
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import org.pircbotx.Channel;
+import org.pircbotx.Colors;
 import org.pircbotx.PircBotX;
 import org.pircbotx.User;
 import pl.shockah.HTTPQuery;
+import pl.shockah.StringTools;
 import pl.shockah.XMLObject;
+import pl.shockah.shocky.Data;
 import pl.shockah.shocky.Module;
-import pl.shockah.shocky.Shocky;
 import pl.shockah.shocky.Utils;
 import pl.shockah.shocky.cmds.Command;
+import pl.shockah.shocky.cmds.CommandCallback;
 
 public class ModuleWolframAlpha extends Module {
-	private static final String apiKey = "J5A2WW-QGK5AEAKTY";
 	protected Command cmd;
 	
 	public String getResult(String query) {
+		String apiKey = Data.config.getString("wolfram-apikey");
+		if (apiKey.isEmpty()) return ">>> WolframAlpha module can't be used without setting up an API key. Get one at http://products.wolframalpha.com/developers/ <<<";
+		
 		try {
 			HTTPQuery q = new HTTPQuery("http://api.wolframalpha.com/v2/query?appid="+apiKey+"&format=Plaintext&input="+URLEncoder.encode(query,"UTF8"));
 			q.connect(true,false);
@@ -29,7 +34,7 @@ public class ModuleWolframAlpha extends Module {
 			
 			ArrayList<XMLObject> xPods = xBase.getElement("queryresult").get(0).getElement("pod");
 			for (XMLObject xPod : xPods) {
-				if (!"true".equals(xPod.getAttribute("primary"))) continue;
+				if (!"true".equals(xPod.getAttribute("primary")) && !xPod.getAttribute("title").equals("Alternate form")) continue;
 				
 				StringBuilder sb = new StringBuilder();
 				ArrayList<XMLObject> xSubpods = xPod.getElement("subpod");
@@ -38,7 +43,7 @@ public class ModuleWolframAlpha extends Module {
 					if (sb.length() != 0) sb.append("  ");
 					sb.append(xSubpod.getElement("plaintext").get(0).getValue());
 				}
-				if (sb.length() != 0) parts.add(xPod.getAttribute("title")+": "+sb.toString().replace("\n"," "));
+				if (sb.length() != 0) parts.add(Colors.BOLD+xPod.getAttribute("title")+Colors.NORMAL+": "+sb.toString().replace("\n"," "));
 			}
 			
 			StringBuilder sb = new StringBuilder();
@@ -47,17 +52,19 @@ public class ModuleWolframAlpha extends Module {
 				sb.append(part);
 			}
 			
-			return sb.toString();
+			return StringTools.limitLength(sb.toString());
 		} catch (Exception e) {e.printStackTrace();}
 		
 		return null;
 	}
 	
 	public String name() {return "wolfram";}
-	public void load() {
+	public void onEnable() {
 		Command.addCommands(cmd = new CmdWolframAlpha());
+		Command.addCommand("wa", cmd);
+		Data.config.setNotExists("wolfram-apikey","");
 	}
-	public void unload() {
+	public void onDisable() {
 		Command.removeCommands(cmd);
 	}
 	
@@ -65,13 +72,12 @@ public class ModuleWolframAlpha extends Module {
 		public String command() {return "wolframalpha";}
 		public String help(PircBotX bot, EType type, Channel channel, User sender) {
 			StringBuilder sb = new StringBuilder();
-			sb.append("wolframalpha/wolfram/wa");
+			sb.append("wolframalpha/wa");
 			sb.append("\nwolframalpha {query} - shows WolframAlpha's result");
 			return sb.toString();
 		}
-		public boolean matches(PircBotX bot, EType type, String cmd) {return cmd.equals(command()) || cmd.equals("wolfram") || cmd.equals("wa");}
 		
-		public void doCommand(PircBotX bot, EType type, Channel channel, User sender, String message) {
+		public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
 			String[] args = message.split(" ");
 			StringBuilder sb = new StringBuilder();
 			for (int i = 1; i < args.length; i++) {
@@ -81,9 +87,8 @@ public class ModuleWolframAlpha extends Module {
 			
 			String result = getResult(sb.toString());
 			if (result == null) return;
-			String msg = (type == EType.Channel ? sender.getNick()+": " : "")+result;
-			msg = Utils.mungeAllNicks(channel,msg,sender.getNick());
-			Shocky.send(bot,type,EType.Channel,EType.Notice,EType.Notice,EType.Console,channel,sender,msg);
+			result = Utils.mungeAllNicks(channel,result,sender.getNick());
+			callback.append(result);
 		}
 	}
 }

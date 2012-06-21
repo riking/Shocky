@@ -1,10 +1,8 @@
 import java.io.File;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map.Entry;
-import java.util.TimeZone;
 import org.pircbotx.Channel;
 import org.pircbotx.PircBotX;
 import org.pircbotx.User;
@@ -22,6 +20,7 @@ import pl.shockah.shocky.Module;
 import pl.shockah.shocky.Shocky;
 import pl.shockah.shocky.Utils;
 import pl.shockah.shocky.cmds.Command;
+import pl.shockah.shocky.cmds.CommandCallback;
 import pl.shockah.shocky.cmds.Command.EType;
 import pl.shockah.shocky.lines.LineMessage;
 
@@ -30,16 +29,16 @@ public class ModuleTell extends Module {
 	protected Command cmd;
 	
 	public String name() {return "tell";}
-	public void load() {
+	public boolean isListener() {return true;}
+	public void onEnable() {
 		Command.addCommands(cmd = new CmdTell());
 		
 		ArrayList<String> lines = FileLine.read(new File("data","tell.cfg"));
 		for (int i = 0; i < lines.size(); i += 4) addTell(lines.get(i),new LineMessage(Long.parseLong(lines.get(i+2)),lines.get(i+1),lines.get(i+3)));
 	}
-	public void unload() {
+	public void onDisable() {
 		Command.removeCommands(cmd);
 	}
-	
 	public void onDataSave() {
 		ArrayList<String> lines = new ArrayList<String>();
 		Iterator<Entry<String,ArrayList<LineMessage>>> it = tells.entrySet().iterator();
@@ -73,8 +72,6 @@ public class ModuleTell extends Module {
 		ArrayList<LineMessage> lines = tells.get(unick);
 		tells.remove(unick);
 		
-		SimpleDateFormat sdf = new SimpleDateFormat("d.MM, HH:mm:ss");
-		sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
 		for (LineMessage line : lines) Shocky.sendNotice(bot,user,line.sender+" said "+Utils.timeAgo(line.time)+": "+line.text);
 	}
 	
@@ -90,16 +87,16 @@ public class ModuleTell extends Module {
 		public String help(PircBotX bot, EType type, Channel channel, User sender) {
 			return "tell {user} {message} - relay the message to user";
 		}
-		public boolean matches(PircBotX bot, EType type, String cmd) {return cmd.equals(command());}
 		
-		public void doCommand(PircBotX bot, EType type, Channel channel, User sender, String message) {
+		public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
 			String[] args = message.split(" ");
+			callback.type = EType.Notice;
 			if (args.length >= 3) {
 				addTell(args[1],new LineMessage(sender.getNick(),StringTools.implode(args,2," ")));
-				Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,"I'll pass that along");
+				callback.append("I'll pass that along");
 				return;
 			}
-			Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,help(bot,type,channel,sender));
+			callback.append(help(bot,type,channel,sender));
 		}
 	}
 }

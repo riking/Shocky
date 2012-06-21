@@ -16,15 +16,12 @@ public class ModuleSamantha extends Module  {
 
 	@Override
 	public String name() {return "samantha";}
+	public boolean isListener() {return true;}
 
 	@Override
-	public void load() {
+	public void onEnable() {
 		Data.config.setNotExists("samantha-chance",5);
 		Data.config.setNotExists("samantha-next",1000*60*2);
-	}
-
-	@Override
-	public void unload() {
 	}
 	
 	private boolean canPerformAction(Channel chan) {

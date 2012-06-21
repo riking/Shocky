@@ -8,10 +8,9 @@
         <jar destfile="shocky.jar" filesetmanifest="mergewithoutmain">
             <manifest>
                 <attribute name="Main-Class" value="pl.shockah.shocky.Shocky"/>
-                <attribute name="Class-Path" value="."/>
+                <attribute name="Class-Path" value=". libs/pircbotx-1.7.jar libs/commons-lang3-3.1.jar libs/LOLCODE-0.11.jar libs/luaj-jse-2.0.2.jar"/>
             </manifest>
             <fileset dir="bin"/>
-            <zipfileset excludes="META-INF/*.SF" src="libs/pircbotx-1.6.jar"/>
         </jar>
     </target>
 </project>

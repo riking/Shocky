@@ -1,13 +1,14 @@
 import java.net.URLEncoder;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.pircbotx.Channel;
 import org.pircbotx.PircBotX;
 import org.pircbotx.User;
 import pl.shockah.HTTPQuery;
-import pl.shockah.JSONObject;
 import pl.shockah.StringTools;
 import pl.shockah.shocky.Module;
-import pl.shockah.shocky.Shocky;
 import pl.shockah.shocky.cmds.Command;
+import pl.shockah.shocky.cmds.CommandCallback;
 import pl.shockah.shocky.cmds.Command.EType;
 
 public class ModuleGoogle extends Module {
@@ -17,21 +18,23 @@ public class ModuleGoogle extends Module {
 	@Override
 	public String name() {return "google";}
 	@Override
-	public void load() {
+	public void onEnable() {
 		Command.addCommands(cmd1 = new CmdGoogle());
 		Command.addCommands(cmd2 = new CmdGoogleImg());
+		Command.addCommand("g", cmd1);
 	}
 	
 	@Override
-	public void unload() {
+	public void onDisable() {
 		Command.removeCommands(cmd1);
 		Command.removeCommands(cmd2);
 	}
 	
-	public void doSearch(Command cmd, PircBotX bot, EType type, Channel channel, User sender, String message) {
+	public void doSearch(Command cmd, PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
 		String[] args = message.split(" ");
 		if (args.length == 1) {
-			Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,cmd.help(bot,type,channel,sender));
+			callback.type = EType.Notice;
+			callback.append(cmd.help(bot,type,channel,sender));
 			return;
 		}
 		
@@ -51,28 +54,27 @@ public class ModuleGoogle extends Module {
 		}
 		q.connect(true, false);
 		String line = q.readWhole();
-		JSONObject json = JSONObject.deserialize(line);
-		JSONObject[] results = json.getJSONObject("responseData").getJSONObjectArray("results");
-		if (results.length==0) {
-			Shocky.send(bot,type,EType.Channel,EType.Notice,EType.Notice,EType.Console,channel,sender,"No results.");
-			return;
-		}
-		String title = results[0].getString("titleNoFormatting");
-		String url = results[0].getString("unescapedUrl");
-		String content = results[0].getString("content");
-		result.append(url);
-		result.append(" -- ");result.append(title);
-		result.append(": ");
-		if (!content.isEmpty())
-			result.append(content);
-		else
-			result.append("No description available.");
-		String output = result.toString();
-		output = StringTools.unicodeParse(output);
-		output = output.replaceAll("</?b>", "\u0002");
-		output = StringTools.unescapeHTML(output);
-		output = StringTools.stripHTMLTags(output);
-		Shocky.send(bot,type,EType.Channel,EType.Notice,EType.Notice,EType.Console,channel,sender,output);
+		
+		try {
+			JSONObject json = new JSONObject(line);
+			JSONArray results = json.getJSONObject("responseData").getJSONArray("results");
+			if (results.length() == 0) {
+				callback.append("No results.");
+				return;
+			}
+			JSONObject r = results.getJSONObject(0);
+			String title = StringTools.ircFormatted(r.getString("titleNoFormatting"),true);
+			String url = StringTools.ircFormatted(r.getString("unescapedUrl"),false);
+			String content = StringTools.ircFormatted(r.getString("content"),true);
+			result.append(url);
+			result.append(" -- ");result.append(title);
+			result.append(": ");
+			if (!content.isEmpty())
+				result.append(content);
+			else
+				result.append("No description available.");
+			callback.append(result);
+		} catch (Exception e) {e.printStackTrace();}
 	}
 	
 	public class CmdGoogle extends Command {
@@ -83,10 +85,9 @@ public class ModuleGoogle extends Module {
 			sb.append("\ngoogle {query} - returns the first Google search result");
 			return sb.toString();
 		}
-		public boolean matches(PircBotX bot, EType type, String cmd) {return cmd.equals(command()) || cmd.equals("g");}
 		@Override
-		public void doCommand(PircBotX bot, EType type, Channel channel, User sender, String message) {
-			doSearch(this, bot, type, channel, sender, message);
+		public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
+			doSearch(this, bot, type, callback, channel, sender, message);
 		}
 	}
 	
@@ -94,14 +95,13 @@ public class ModuleGoogle extends Module {
 		public String command() {return "gis";}
 		public String help(PircBotX bot, EType type, Channel channel, User sender) {
 			StringBuilder sb = new StringBuilder();
-			sb.append("gis/gi");
+			sb.append("gis");
 			sb.append("\ngis {query} - returns the first Google Image search result");
 			return sb.toString();
 		}
-		public boolean matches(PircBotX bot, EType type, String cmd) {return cmd.equals(command()) || cmd.equals("gi");}
 		@Override
-		public void doCommand(PircBotX bot, EType type, Channel channel, User sender, String message) {
-			doSearch(this, bot, type, channel, sender, message);
+		public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
+			doSearch(this, bot, type, callback, channel, sender, message);
 		}
 	}
 }

@@ -5,34 +5,46 @@ import org.pircbotx.User;
 import pl.shockah.HTTPQuery;
 import pl.shockah.StringTools;
 import pl.shockah.shocky.Data;
-import pl.shockah.shocky.Module;
-import pl.shockah.shocky.Shocky;
+import pl.shockah.shocky.ScriptModule;
 import pl.shockah.shocky.cmds.Command;
+import pl.shockah.shocky.cmds.CommandCallback;
 import pl.shockah.shocky.cmds.Command.EType;
 
-public class ModulePHP extends Module {
+public class ModulePHP extends ScriptModule {
 	protected Command cmd;
 	
 	public String name() {return "php";}
-	public void load() {
+	public String identifier() {return "php";}
+	public void onEnable() {
 		Data.config.setNotExists("php-url","http://localhost/shocky/shocky.php");
 		Command.addCommands(cmd = new CmdPHP());
 	}
-	public void unload() {
+	public void onDisable() {
 		Command.removeCommands(cmd);
 	}
 	
-	public String parse(PircBotX bot, EType type, Channel channel, User sender, String code) {
+	public String parse(PircBotX bot, EType type, Channel channel, User sender, String code, String message) {
 		if (code == null) return "";
 		
-		StringBuilder sb = new StringBuilder("$channel = \""+channel.getName()+"\"; $bot = \""+bot.getNick().replace("\"","\\\"")+"\"; $sender = \""+sender.getNick().replace("\"","\\\"")+"\";");
+		StringBuilder sb = new StringBuilder("$channel = \""+channel.getName()+"\";$bot = \""+bot.getNick().replace("\"","\\\"")+"\";$sender = \""+sender.getNick().replace("\"","\\\"")+"\";");
+		if (message != null) {
+			String[] args = message.split(" ");
+			String argsImp = StringTools.implode(args,1," "); if (argsImp == null) argsImp = "";
+			sb.append("$argc = "+(args.length-1)+";$args = \""+argsImp.replace("\"","\\\"")+"\";$ioru = \""+(args.length-1 == 0 ? sender.getNick() : argsImp).replace("\"","\\\"")+"\";");
+			sb.append("$arg = array(");
+			for (int i = 1; i < args.length; i++) {
+				if (i != 1) sb.append(",");
+				sb.append("\""+args[i].replace("\"","\\\"")+"\"");
+			}
+			sb.append(");");
+		}
 		
 		User[] users = channel.getUsers().toArray(new User[channel.getUsers().size()]);
-		sb.append(" $randnick = \""+users[new Random().nextInt(users.length)].getNick().replace("\"","\\\"")+"\";");
+		sb.append("$randnick = \""+users[new Random().nextInt(users.length)].getNick().replace("\"","\\\"")+"\";");
 		
 		code = sb.toString()+code;
 		
-		HTTPQuery q = new HTTPQuery(Data.config.getString("php-phpurl")+"?"+HTTPQuery.parseArgs("code",code));
+		HTTPQuery q = new HTTPQuery(Data.config.getString("php-url")+"?"+HTTPQuery.parseArgs("code",code));
 		q.connect(true,false);
 		
 		sb = new StringBuilder();
@@ -41,24 +53,22 @@ public class ModulePHP extends Module {
 			sb.append(line);
 		}
 		
-		return sb.toString();
+		return StringTools.limitLength(sb.toString());
 	}
 	
 	public class CmdPHP extends Command {
 		public String command() {return "php";}
 		public String help(PircBotX bot, EType type, Channel channel, User sender) {return "\nphp {code} - runs PHP code";}
-		public boolean matches(PircBotX bot, EType type, String cmd) {
-			return cmd.equals(command());
-		}
 		
-		public void doCommand(PircBotX bot, EType type, Channel channel, User sender, String message) {
+		public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
 			String[] args = message.split(" ");
 			if (args.length < 2) {
-				Shocky.send(bot,type,EType.Notice,EType.Notice,EType.Notice,EType.Console,channel,sender,help(bot,type,channel,sender));
+				callback.type = EType.Notice;
+				callback.append(help(bot,type,channel,sender));
 				return;
 			}
 			
-			Shocky.send(bot,type,channel,sender,parse(bot,type,channel,sender,StringTools.implode(args,1," ")));
+			callback.append(parse(bot,type,channel,sender,StringTools.implode(args,1," "),null));
 		}
 	}
 }

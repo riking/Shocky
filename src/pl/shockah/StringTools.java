@@ -1,12 +1,20 @@
 package pl.shockah;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringEscapeUtils;
+import org.apache.commons.lang3.text.translate.UnicodeUnescaper;
+
+import pl.shockah.shocky.Data;
 
 public class StringTools {
 	private static HashMap<String,String> htmlEntities;
 	public static final Pattern unicodePattern = Pattern.compile("\\\\u([0-9a-fA-F]{4})");
+	public static final Pattern htmlTagPattern = Pattern.compile("<([^>]+)>");
+	public static final UnicodeUnescaper unicodeEscape = new UnicodeUnescaper();
 	
 	static {
 		htmlEntities = new HashMap<String,String>();
@@ -51,59 +59,12 @@ public class StringTools {
 	}
 	
 	public static String escapeHTML(String s) {
-		int length = s.length();
-		int newLength = length;
-		boolean someCharacterEscaped = false;
-		for (int i = 0; i < length; i++) {
-			char c = s.charAt(i);
-			int cint = 0xffff & c;
-			if (cint < 32) {
-				switch(c) {
-					case '\r': case '\n': case '\t': case '\f': break;
-					default: {
-						newLength -= 1;
-						someCharacterEscaped = true;
-					} break;
-				}
-			} else {
-				switch(c) {
-					case '\"': {
-						newLength += 5;
-						someCharacterEscaped = true;
-					} break;
-					case '&': case '\'': {
-						newLength += 4;
-						someCharacterEscaped = true;
-					} break;
-					case '<': case '>': {
-						newLength += 3;
-						someCharacterEscaped = true;
-					} break;
-				}
-			}
+		s = s.replace("&","&amp;");
+		for (String key : htmlEntities.keySet()) {
+			if (key.equals("&amp;")) continue;
+			s = s.replace(htmlEntities.get(key),key);
 		}
-		if (!someCharacterEscaped) return s;
-		StringBuffer sb = new StringBuffer(newLength);
-		for (int i = 0; i < length; i++) {
-			char c = s.charAt(i);
-			int cint = 0xffff & c;
-			if (cint < 32) {
-				switch(c) {
-					case '\r': case '\n': case '\t': case '\f': sb.append(c); break;
-					default: break;
-				}
-			} else {
-				switch(c) {
-					case '\"': sb.append("&quot;"); break;
-					case '\'': sb.append("&#39;"); break;
-					case '&': sb.append("&amp;"); break;
-					case '<': sb.append("&lt;"); break;
-					case '>': sb.append("&gt;"); break;
-					default: sb.append(c); break;
-				}
-			}
-		}
-		return sb.toString();
+		return s;
 	}
 	public static String unescapeHTML(String source) {
 		boolean continueLoop;
@@ -134,36 +95,85 @@ public class StringTools {
 		} while (continueLoop);
 		return source;
 	}
-	public static String stripHTMLTags(String s) {
-		return s.replaceAll("\\<[^>]*>","");
+	public static String stripHTMLTags(CharSequence s) {
+		Matcher m = htmlTagPattern.matcher(s);
+		StringBuffer sb = new StringBuffer();
+		while (m.find())
+			m.appendReplacement(sb, "");
+		m.appendTail(sb);
+		return sb.toString();
 	}
-	public static String unicodeParse(String s) {
+	public static String unicodeParse(CharSequence s) {
 		Matcher m = unicodePattern.matcher(s);
+		StringBuffer sb = new StringBuffer();
 		while (m.find()) {
-			int count = m.groupCount();
-			if (count == 1) {
-				short hex = Short.valueOf(m.group(1),16);
-				s = s.replaceAll("\\\\u"+m.group(1),Character.toString((char)hex));
-			}
-			m = unicodePattern.matcher(s);
+			int hex = Integer.valueOf(m.group(1),16);
+			m.appendReplacement(sb, Character.toString((char)hex));
 		}
-		return s;
+		m.appendTail(sb);
+		return sb.toString();
 	}
 	
-	public static boolean isNumber(String s) {
-		try {
-			Integer.parseInt(s);
-		} catch (NumberFormatException e) {return false;}
-		return true;
+	public static boolean isNumber(CharSequence s) {
+		boolean ret = true;
+		for (int i = 0; ret && i < s.length(); i++) {
+			Character c = s.charAt(i);
+			if (i == 0 && c == '-')
+				continue;
+			if (!Character.isDigit(c))
+				ret = false;
+		}
+		return ret;
 	}
 	
 	public static boolean isBoolean(String s) {
 		return (s.equalsIgnoreCase("true")||s.equalsIgnoreCase("false"));
 	}
 	
-	public static String implode(String[] spl, String separator) {return implode(spl,0,spl.length-1,separator);}
-	public static String implode(String[] spl, int a, String separator) {return implode(spl,a,spl.length-1,separator);}
-	public static String implode(String[] spl, int a, int b, String separator) {
+	public static String ircFormatted(CharSequence s, boolean urlDecode) {
+		String output = unicodeEscape.translate(s);
+		output = StringEscapeUtils.unescapeHtml4(output);
+		output = output.replaceAll("</?b>", "\u0002");
+		output = output.replaceAll("</?u>", "\u001f");
+		if (urlDecode) {
+			try {
+				output = URLDecoder.decode(output, "utf8");
+			} catch (UnsupportedEncodingException e) {
+				e.printStackTrace();
+			}
+		}
+		output = StringEscapeUtils.unescapeJava(output);
+		output = stripHTMLTags(output);
+		output = deleteWhitespace(output);
+		output = limitLength(output);
+		return output;
+	}
+	
+    public static String deleteWhitespace(CharSequence str) {
+        StringBuilder sb = new StringBuilder(str.length());
+        for (int i = 0; i < str.length(); i++) {
+        	char c = str.charAt(i);
+            if (i > 0 && Character.isWhitespace(c) && Character.isWhitespace(str.charAt(i-1))) {
+                continue;
+            }
+            if (c == '\r' || c == '\n') {
+            	sb.append(' ');
+            	continue;
+            }
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+    
+    public static String limitLength(CharSequence str) {
+    	if (str.length() > Data.config.getInt("main-messagelength"))
+    		str = str.subSequence(0, Data.config.getInt("main-messagelength"))+"...";
+    	return str.toString();
+    }
+	
+	public static <T> String implode(T[] spl, String separator) {return implode(spl,0,spl.length-1,separator);}
+	public static <T> String implode(T[] spl, int a, String separator) {return implode(spl,a,spl.length-1,separator);}
+	public static <T> String implode(T[] spl, int a, int b, String separator) {
 		StringBuffer sb = new StringBuffer();
 		while (a <= b) {
 			if (sb.length() != 0) sb.append(separator);
