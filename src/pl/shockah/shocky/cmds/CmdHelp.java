@@ -7,8 +7,8 @@ import org.pircbotx.PircBotX;
 import org.pircbotx.User;
 
 public class CmdHelp extends Command {
-	public String command() {return "help";}
-	public String help(PircBotX bot, EType type, Channel channel, User sender) {
+	@Override public String command() {return "help";}
+	@Override public String help(PircBotX bot, EType type, Channel channel, User sender) {
 		StringBuilder sb = new StringBuilder();
 		sb.append("help {command} - shows command's help\n");
 		
@@ -21,9 +21,8 @@ public class CmdHelp extends Command {
 		}
 		return sb.toString();
 	}
-	public boolean matches(PircBotX bot, EType type, String cmd) {return cmd.equals(command());}
 	
-	public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
+	@Override public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
 		String[] args = message.split(" ");
 		callback.type = EType.Notice;
 		if (args.length == 2) {
