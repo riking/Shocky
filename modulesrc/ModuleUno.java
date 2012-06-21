@@ -363,6 +363,26 @@ public class ModuleUno extends Module implements ActionListener {
         		Shocky.sendChannel(bot, channel, Utils.mungeAllNicks(channel, sb.toString()));
         	}
         });
+        unocommands.put("ti", new UCommand("ti") {
+        	@Override public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
+        		Shocky.sendChannel(bot, channel, "Run time: "+ new (new Date().getTime() - gameStart.getTime()));
+        	}
+        });
+        unocommands.put("ca", new UCommand("ca") {
+        	@Override public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
+        		Shocky.sendNotice(bot, sender, UnoPrintHand(sender.toString()));
+        	}
+        });
+        unocommands.put("cd", new UCommand("cd") {
+        	@Override public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
+        		Shocky.sendChannel(bot, channel, UnoCardColor(PlayCard));
+        	}
+        });
+        unocommands.put("tu", new UCommand("tu") {
+        	@Override public void doCommand(PircBotX bot, EType type, CommandCallback callback, Channel channel, User sender, String message) {
+        		Shocky.sendChannel(bot, channel, UnoCardColor(PlayCard));
+        	}
+        });
         //TODO
     }
     /** Resets variables and cancels timers in preparation to start a new game.*/
